@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Quandify Water Consumption",
+        "description": "Enter your Quandify credentials",
+        "data": {
+          "account_id": "Account ID (GUID)",
+          "password": "Password", 
+          "organization_id": "Organization ID (GUID)"
+        }
+      }
+    },
+    "error": {
+      "invalid_guid": "Account ID must be a valid GUID format",
+      "cannot_connect": "Failed to connect to Quandify API",
+      "invalid_auth": "Invalid credentials",
+      "unknown": "Unexpected error occurred"
+    }
+  }
+}
