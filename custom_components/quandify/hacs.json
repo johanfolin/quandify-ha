@@ -1,0 +1,9 @@
+{
+  "name": "Quandify Water Consumption",
+  "content_in_root": false,
+  "filename": "quandify",
+  "country": ["SE", "NO", "DK", "FI"],
+  "homeassistant": "2023.1.0",
+  "render_readme": true,
+  "iot_class": "Cloud Polling"
+}
