@@ -262,7 +262,10 @@ class QuandifyWaterSensor(CoordinatorEntity, SensorEntity):
             "integration": DOMAIN,
         }
         
-        if self.coordinator.last_update_success_time:
+        # Add last update time if available
+        if hasattr(self.coordinator, 'last_update_success_time') and self.coordinator.last_update_success_time:
             attrs["last_updated"] = self.coordinator.last_update_success_time.isoformat()
+        elif self.coordinator.last_update_success:
+            attrs["last_updated"] = datetime.now().isoformat()
             
         return attrs
