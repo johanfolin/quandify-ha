@@ -3,9 +3,14 @@
 DOMAIN = "quandify"
 DEFAULT_NAME = "Quandify Water"
 
-# API URLs
+# API Configuration
 AUTH_URL = "https://auth.quandify.com/"
 BASE_URL = "https://api.quandify.com"
 
-# Update intervals
-UPDATE_INTERVAL_MINUTES = 60  # Update every hour
+# Configuration
+UPDATE_INTERVAL_MINUTES = 60
+DEFAULT_SCAN_INTERVAL = 3600  # 1 hour in seconds
+
+# Configuration keys
+CONF_ACCOUNT_ID = "account_id"
+CONF_ORGANIZATION_ID = "organization_id"
