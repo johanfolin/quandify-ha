@@ -17,6 +17,8 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, UnitOfVolume
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntryType
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -24,7 +26,15 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from .const import DOMAIN, DEFAULT_NAME, AUTH_URL, BASE_URL, UPDATE_INTERVAL_MINUTES
+from .const import (
+    DOMAIN,
+    DEFAULT_NAME,
+    AUTH_URL,
+    BASE_URL,
+    UPDATE_INTERVAL_MINUTES,
+    CONF_ACCOUNT_ID,
+    CONF_ORGANIZATION_ID,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,20 +45,25 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Quandify sensor."""
     
-    coordinator = QuandifyDataCoordinator(hass, config_entry.data)
+    config = hass.data[DOMAIN][config_entry.entry_id]
+    
+    coordinator = QuandifyDataCoordinator(hass, config)
+    
+    # Fetch initial data so we have data when entities subscribe
     await coordinator.async_config_entry_first_refresh()
     
-    async_add_entities([QuandifyWaterSensor(coordinator)])
+    async_add_entities([QuandifyWaterSensor(coordinator, config_entry)])
 
 class QuandifyDataCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Quandify data."""
 
     def __init__(self, hass: HomeAssistant, config: dict[str, Any]) -> None:
-        """Initialize."""
-        self.account_id = config["account_id"]
+        """Initialize the coordinator."""
+        self.account_id = config[CONF_ACCOUNT_ID]
         self.password = config[CONF_PASSWORD]
-        self.organization_id = config["organization_id"]
+        self.organization_id = config[CONF_ORGANIZATION_ID]
         self._token = None
+        self._token_expires = None
         
         super().__init__(
             hass,
@@ -60,57 +75,94 @@ class QuandifyDataCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> float:
         """Fetch data from Quandify API."""
         try:
-            # Get current day's data (from midnight to now)
+            # Calculate time range for current day
             now = datetime.now()
             start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
             
             from_timestamp = int(start_of_day.timestamp())
             to_timestamp = int(now.timestamp())
             
-            # Authenticate if no token or token expired
-            if not self._token:
-                self._token = await self._authenticate()
-                if not self._token:
-                    raise UpdateFailed("Authentication failed")
+            _LOGGER.debug(
+                "Fetching data for period: %s to %s",
+                start_of_day.isoformat(),
+                now.isoformat()
+            )
+            
+            # Ensure we have a valid token
+            token = await self._ensure_token()
+            if not token:
+                raise UpdateFailed("Failed to authenticate with Quandify API")
             
             # Fetch consumption data
             data = await self._get_consumption_data(from_timestamp, to_timestamp)
+            
             if data is None:
-                # Try re-authenticating once
-                _LOGGER.warning("Data fetch failed, trying to re-authenticate")
-                self._token = await self._authenticate()
-                if self._token:
+                # Token might be expired, try once more with new token
+                _LOGGER.warning("Data fetch failed, attempting re-authentication")
+                self._token = None
+                token = await self._ensure_token()
+                if token:
                     data = await self._get_consumption_data(from_timestamp, to_timestamp)
                 
-            if data is None:
-                raise UpdateFailed("Failed to fetch consumption data")
-                
+                if data is None:
+                    raise UpdateFailed("Failed to fetch consumption data after re-authentication")
+            
+            _LOGGER.debug("Successfully fetched consumption data: %s", data)
             return data
             
         except Exception as err:
-            raise UpdateFailed(f"Error communicating with API: {err}")
+            _LOGGER.error("Error updating Quandify data: %s", err)
+            raise UpdateFailed(f"Error communicating with Quandify API: {err}") from err
+
+    async def _ensure_token(self) -> str | None:
+        """Ensure we have a valid authentication token."""
+        if self._token and self._token_expires and datetime.now() < self._token_expires:
+            return self._token
+        
+        return await self._authenticate()
 
     async def _authenticate(self) -> str | None:
         """Authenticate with Quandify API."""
-        payload = {"account_id": self.account_id, "password": self.password}
+        payload = {
+            "account_id": self.account_id,
+            "password": self.password
+        }
         headers = {"Content-Type": "application/json"}
         
         try:
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
-                None, 
-                lambda: requests.post(AUTH_URL, json=payload, headers=headers, timeout=10)
+                None,
+                lambda: requests.post(
+                    AUTH_URL,
+                    json=payload,
+                    headers=headers,
+                    timeout=15
+                )
             )
             
             if response.status_code == 200:
-                return response.json().get("id_token")
+                data = response.json()
+                token = data.get("id_token")
+                if token:
+                    self._token = token
+                    # Set token expiry to 23 hours from now (tokens typically last 24h)
+                    self._token_expires = datetime.now() + timedelta(hours=23)
+                    _LOGGER.debug("Authentication successful")
+                    return token
+                else:
+                    _LOGGER.error("No token in authentication response")
             else:
-                _LOGGER.error("Authentication failed: %s", response.text)
-                return None
+                _LOGGER.error(
+                    "Authentication failed: HTTP %s - %s",
+                    response.status_code,
+                    response.text
+                )
                 
         except Exception as e:
             _LOGGER.error("Error during authentication: %s", str(e))
-            return None
+            
+        return None
 
     async def _get_consumption_data(self, from_ts: int, to_ts: int) -> float | None:
         """Fetch consumption data from API."""
@@ -129,18 +181,34 @@ class QuandifyDataCoordinator(DataUpdateCoordinator):
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
-                lambda: requests.get(url, headers=headers, params=params, timeout=30)
+                lambda: requests.get(
+                    url,
+                    headers=headers,
+                    params=params,
+                    timeout=30
+                )
             )
             
             if response.status_code == 200:
                 data = response.json()
-                if "aggregate" in data and "total" in data["aggregate"] and "totalVolume" in data["aggregate"]["total"]:
-                    return float(data["aggregate"]["total"]["totalVolume"])
+                
+                # Navigate to the totalVolume data
+                if (
+                    "aggregate" in data
+                    and "total" in data["aggregate"]
+                    and "totalVolume" in data["aggregate"]["total"]
+                ):
+                    volume = data["aggregate"]["total"]["totalVolume"]
+                    return float(volume) if volume is not None else 0.0
                 else:
-                    _LOGGER.error("Unexpected data structure in response")
+                    _LOGGER.error("Unexpected API response structure: %s", list(data.keys()) if isinstance(data, dict) else type(data))
                     return None
             else:
-                _LOGGER.error("API request failed: %s", response.text)
+                _LOGGER.error(
+                    "API request failed: HTTP %s - %s",
+                    response.status_code,
+                    response.text
+                )
                 return None
                 
         except Exception as e:
@@ -150,36 +218,51 @@ class QuandifyDataCoordinator(DataUpdateCoordinator):
 class QuandifyWaterSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Quandify water consumption sensor."""
 
-    def __init__(self, coordinator: QuandifyDataCoordinator) -> None:
+    _attr_has_entity_name = True
+    _attr_name = None
+
+    def __init__(self, coordinator: QuandifyDataCoordinator, config_entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
-        self._attr_name = DEFAULT_NAME
-        self._attr_unique_id = f"quandify_{coordinator.organization_id}_water"
+        
+        self.config_entry = config_entry
+        self._attr_unique_id = f"{DOMAIN}_{coordinator.organization_id}_water_consumption"
         self._attr_device_class = SensorDeviceClass.WATER
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         self._attr_native_unit_of_measurement = UnitOfVolume.LITERS
         self._attr_icon = "mdi:water"
+        self._attr_suggested_display_precision = 1
+        
+        # Device info
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, coordinator.organization_id)},
+            name="Quandify Water Monitor",
+            manufacturer="Quandify",
+            model="Water Consumption Monitor",
+            entry_type=DeviceEntryType.SERVICE,
+        )
 
     @property
     def native_value(self) -> float | None:
         """Return the state of the sensor."""
-        return self.coordinator.data
+        if self.coordinator.data is not None:
+            return round(float(self.coordinator.data), 2)
+        return None
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        return {
-            "identifiers": {(DOMAIN, self.coordinator.organization_id)},
-            "name": "Quandify Water Monitor",
-            "manufacturer": "Quandify",
-            "model": "Water Consumption Monitor",
-        }
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return self.coordinator.last_update_success
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
-        return {
+        attrs = {
             "organization_id": self.coordinator.organization_id,
-            "last_updated": datetime.now().isoformat(),
-            "unit": "liters",
+            "integration": DOMAIN,
         }
+        
+        if self.coordinator.last_update_success_time:
+            attrs["last_updated"] = self.coordinator.last_update_success_time.isoformat()
+            
+        return attrs
