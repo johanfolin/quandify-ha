@@ -40,7 +40,6 @@ You'll need your Quandify credentials:
 
 ## Features
 
-- ✅ Real-time water consumption monitoring
 - ✅ Energy Dashboard integration
 - ✅ Automatic authentication handling
 - ✅ Hourly data updates
