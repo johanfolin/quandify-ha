@@ -1,35 +1,42 @@
 import requests
 import logging
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Base URLs
-AUTH_URL = "https://auth.quandify.com/api/auth/login"  # Fixed: Added proper endpoint
+# API Configuration
+AUTH_URL = "https://auth.quandify.com/"
 BASE_URL = "https://api.quandify.com"
 
-# Replace with your actual credentials
-ACCOUNT_ID = "your_account_id_here"  # Your account ID
-PASSWORD = "your_password_here"      # Your password
-ORGANIZATION_ID = "your_org_id_here" # Your organization ID
+# Your credentials - Replace with your actual values
+ACCOUNT_ID = "your-guid-account-id-here"     # Your GUID account ID
+PASSWORD = "your_password_here"              # Your password
+ORGANIZATION_ID = "your-organization-id-here"  # Your organization ID
 
-# Time range (example: Unix timestamps)
-FROM_TIMESTAMP = 1700000000
-TO_TIMESTAMP = 1700600000
+# Time range (Unix timestamps)
+FROM_TIMESTAMP = 1700000000  # Adjust as needed
+TO_TIMESTAMP = 1700600000    # Adjust as needed
 
 def authenticate(account_id, password):
-    """Authenticate with the API and retrieve an ID token."""
+    """Authenticate with the Quandify API and retrieve an ID token."""
     payload = {"account_id": account_id, "password": password}
     headers = {"Content-Type": "application/json"}
     
     try:
-        response = requests.post(AUTH_URL, json=payload, headers=headers)
-        response.raise_for_status()  # Raises HTTPError for bad responses
+        response = requests.post(AUTH_URL, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
         
-        return response.json().get("id_token")
-        
+        token = response.json().get("id_token")
+        if token:
+            logging.info("Authentication successful")
+            return token
+        else:
+            logging.error("No token received in response")
+            return None
+            
     except requests.exceptions.HTTPError as e:
-        logging.error("Authentication failed with HTTP error: %s - %s", e, response.text)
+        logging.error("Authentication failed: HTTP %s - %s", e.response.status_code, e.response.text)
         return None
     except requests.exceptions.RequestException as e:
         logging.error("Network error during authentication: %s", str(e))
@@ -52,59 +59,63 @@ def get_aggregated_data(id_token, organization_id, from_ts, to_ts):
     }
     
     try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()  # Raises HTTPError for bad responses
+        response = requests.get(url, headers=headers, params=params, timeout=30)
+        response.raise_for_status()
         
         data = response.json()
         
-        # Check if the expected data structure exists
+        # Navigate to the totalVolume data
         if "aggregate" in data and "total" in data["aggregate"] and "totalVolume" in data["aggregate"]["total"]:
             return data["aggregate"]["total"]["totalVolume"]
         else:
-            logging.error("Unexpected data structure in response: %s", data)
+            logging.error("Expected data structure not found in response")
+            logging.debug("Response structure: %s", list(data.keys()) if isinstance(data, dict) else type(data))
             return None
             
     except requests.exceptions.HTTPError as e:
-        logging.error("Failed to fetch data with HTTP error: %s - %s", e, response.text if 'response' in locals() else 'No response')
+        logging.error("Failed to fetch data: HTTP %s - %s", e.response.status_code, e.response.text)
         return None
     except requests.exceptions.RequestException as e:
         logging.error("Network error fetching data: %s", str(e))
-        return None
-    except KeyError as e:
-        logging.error("Missing key in response data: %s", str(e))
         return None
     except Exception as e:
         logging.error("Unexpected error fetching data: %s", str(e))
         return None
 
+def timestamp_to_date(timestamp):
+    """Convert Unix timestamp to readable date."""
+    return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+
 def main():
+    """Main function to fetch Quandify consumption data."""
+    
     # Validate credentials are set
-    if not all([ACCOUNT_ID != "your_account_id_here", 
-                PASSWORD != "your_password_here", 
-                ORGANIZATION_ID != "your_org_id_here"]):
+    if any(cred.startswith("your_") for cred in [ACCOUNT_ID, PASSWORD, ORGANIZATION_ID]):
         logging.error("Please set your actual credentials in the script")
+        print("Error: Update ACCOUNT_ID, PASSWORD, and ORGANIZATION_ID with your actual values")
         return
     
-    # Step 1: Authenticate and get the ID token
-    logging.info("Authenticating with account ID: %s", ACCOUNT_ID)
-    id_token = authenticate(ACCOUNT_ID, PASSWORD)
+    # Show time range for clarity
+    logging.info("Fetching data from %s to %s", 
+                timestamp_to_date(FROM_TIMESTAMP), 
+                timestamp_to_date(TO_TIMESTAMP))
     
+    # Step 1: Authenticate
+    id_token = authenticate(ACCOUNT_ID, PASSWORD)
     if not id_token:
         logging.error("Authentication failed. Exiting.")
         return
     
-    logging.info("Authentication successful")
-    
-    # Step 2: Fetch the total volume
-    logging.info("Fetching data for organization: %s", ORGANIZATION_ID)
+    # Step 2: Fetch consumption data
     total_volume = get_aggregated_data(id_token, ORGANIZATION_ID, FROM_TIMESTAMP, TO_TIMESTAMP)
     
     if total_volume is not None:
-        logging.info("Total Volume: %s", total_volume)
+        logging.info("Successfully retrieved consumption data")
         print(f"Total Volume: {total_volume}")
+        return total_volume
     else:
-        logging.error("Failed to fetch total volume.")
+        logging.error("Failed to fetch consumption data")
+        return None
 
-# Run the script
 if __name__ == "__main__":
     main()
