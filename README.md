@@ -50,7 +50,7 @@ For issues or feature requests, please [open an issue](https://github.com/johanf
 
 [hacs]: https://github.com/custom-components/hacs
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg
-[releases-shield]: https://img.shields.io/github/release/johanfolin/quandify-homeassistant.svg
+[releases-shield]: https://img.shields.io/github/release/johanfolin/quandify-ha.svg
 [releases]: https://github.com/johanfolin/quandify-ha/releases
-[commits-shield]: https://img.shields.io/github/commit-activity/y/johanfolin/quandify-homeassistant.svg
+[commits-shield]: https://img.shields.io/github/commit-activity/y/johanfolin/quandify-ha.svg
 [commits]: https://github.com/johanfolin/quandify-ha/commits/main
