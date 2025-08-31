@@ -30,7 +30,7 @@ Monitor your Quandify water consumption directly in Home Assistant's Energy dash
 ## Configuration
 
 You'll need your Quandify credentials:
-Create API account at https://partner.quandify.com
+Create API account at https://partner.quandify.com.
 Use GUID and password for the user. Organization ID is account owner's GUID.
 
 - **Account ID**: Your GUID account identifier
