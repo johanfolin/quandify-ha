@@ -47,11 +47,11 @@ You'll need your Quandify credentials:
 
 ## Support
 
-For issues or feature requests, please [open an issue](https://github.com/yourusername/quandify-homeassistant/issues).
+For issues or feature requests, please [open an issue](https://github.com/johanfolin/quandify-ha/issues).
 
 [hacs]: https://github.com/custom-components/hacs
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg
-[releases-shield]: https://img.shields.io/github/release/yourusername/quandify-homeassistant.svg
-[releases]: https://github.com/yourusername/quandify-homeassistant/releases
-[commits-shield]: https://img.shields.io/github/commit-activity/y/yourusername/quandify-homeassistant.svg
-[commits]: https://github.com/yourusername/quandify-homeassistant/commits/main
+[releases-shield]: https://img.shields.io/github/release/johanfolin/quandify-homeassistant.svg
+[releases]: https://github.com/johanfolin/quandify-ha/releases
+[commits-shield]: https://img.shields.io/github/commit-activity/y/johanfolin/quandify-homeassistant.svg
+[commits]: https://github.com/johanfolin/quandify-ha/commits/main
