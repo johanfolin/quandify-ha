@@ -1,10 +1,6 @@
 # quandify-ha
 An attempt to create a Home Assistant integration for Quandify's API
 
-Create API account at https://partner.quandify.com
-
-Use GUID and password for the user. Organization ID is account owner's GUID.
-
 # Quandify Home Assistant Integration
 
 [![hacs][hacsbadge]][hacs]
@@ -34,6 +30,9 @@ Monitor your Quandify water consumption directly in Home Assistant's Energy dash
 ## Configuration
 
 You'll need your Quandify credentials:
+Create API account at https://partner.quandify.com
+Use GUID and password for the user. Organization ID is account owner's GUID.
+
 - **Account ID**: Your GUID account identifier
 - **Password**: Your Quandify account password  
 - **Organization ID**: Your organization GUID
