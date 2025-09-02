@@ -17,7 +17,7 @@ After installation, add the integration through:
 You'll need:
 - Your Quandify Account ID (GUID format)
 - Password
-- Organization ID
+- Organization ID (GUID format)
 
 ## Energy Dashboard
 
