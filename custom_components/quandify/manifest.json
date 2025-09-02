@@ -4,6 +4,7 @@
   "codeowners": ["@johanfolin"],
   "config_flow": true,
   "documentation": "https://github.com/johanfolin/quandify-ha",
+  "integration_type": "device"
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/johanfolin/quandify-ha/issues",
   "requirements": ["requests>=2.28.0"],
