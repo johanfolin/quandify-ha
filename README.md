@@ -1,5 +1,7 @@
 # quandify-ha
-An attempt to create a Home Assistant integration for Quandify's API
+An attempt to create a Home Assistant integration for Quandify's API.
+
+!! Use the integration developed by Quandify instead: https://github.com/quandify/ha-quandify !!
 
 # Quandify Home Assistant Integration
 
